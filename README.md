@@ -1,4 +1,4 @@
-# Dynamic Simulation of Sustainable Investment Strategies in Renewable Energy
+# Renewable Returns: Advanced Analytics for Sustainable Investment Decisions
 
 ## Project Overview
 This project, "Dynamic Simulation of Sustainable Investment Strategies in Renewable Energy," merges in-depth financial analysis with sustainability considerations to aid investors, analysts, and policymakers in making informed decisions. By focusing on key financial metrics alongside environmental impact measures, this initiative simulates the complex market conditions affecting investment outcomes in the renewable energy sector.

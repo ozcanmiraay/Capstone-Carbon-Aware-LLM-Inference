@@ -29,9 +29,8 @@ The project employs a multifaceted approach, incorporating:
 Instructions on how to clone the repository and set up the project environment.
 
 ```bash
-git clone https://github.com/yourusername/your-repository-name.git
-cd your-repository-name
-# Follow setup instructions for the project environment
+git clone https://github.com/ozcanmiraay/capstone.git
+cd capstone
 ```
 
 ## Usage
@@ -54,10 +53,10 @@ Guidelines for how others can contribute to the project.
 
 ## License
 
-State the license under which this project is available. Common licenses for open-source projects include MIT, Apache 2.0, etc.
+To be determined. 
 
 ## Acknowledgments
 
-- Mention of Professor Tambasco and any other contributors or advisors.
+- Mention of Professor Tambasco and any other potential contributors or advisors.
 - Any libraries or frameworks used in the project.
 - Any data sources or external contributions.

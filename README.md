@@ -7,4 +7,7 @@
 - This folder keeps track of the code I modified in Vidur simulator to fit my research needs better.
 
 ### vidur-experiments
-- This folder contains the experiment scripts I wrote to run Vidur simulations with different hardware configurations and inference scenarios. 
+- This folder contains the experiment scripts I wrote to run Vidur simulations with different hardware configurations and inference scenarios.
+
+### unit-tests
+- This folder contains the test scripts I wrote to validate that code modifications work as intended.

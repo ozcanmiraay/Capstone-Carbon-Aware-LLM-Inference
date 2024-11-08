@@ -23,3 +23,6 @@ My final deliverable will be a research paper with an associated Github codebase
 
 #### unit-tests
 - This folder contains the test scripts I wrote to validate that code modifications work as intended.
+
+#### Reference
+microsoft. (n.d.). GitHub - microsoft/vidur: A large-scale simulation framework for LLM inference. GitHub. https://github.com/microsoft/vidur?tab=readme-ov-file

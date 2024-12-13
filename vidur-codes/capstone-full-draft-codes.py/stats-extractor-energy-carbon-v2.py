@@ -1,6 +1,7 @@
 import argparse
 import glob
 import json
+import re
 import os
 import numpy as np
 import pandas as pd
@@ -129,11 +130,12 @@ def calculate_carbon_emissions(total_energy_kwh, carbon_intensity, manufacturing
     scope_3_emissions = manufacturing_emissions * gpu_hours
     # Total emissions
     return scope_2_emissions + scope_3_emissions
-    
+
 def process_mfu_energy(run_dir: str, power_values: dict):
     """
-    Extract MFU values and calculate energy consumption for each batch stage, saving the results.
-    
+    Extract MFU values and calculate energy consumption for each stage across all replicas,
+    considering the number of GPUs involved.
+
     Args:
         run_dir (str): Simulation output directory containing the MFU distribution files.
         power_values (dict): GPU-specific power consumption values.
@@ -141,41 +143,87 @@ def process_mfu_energy(run_dir: str, power_values: dict):
     Returns:
         None
     """
-    # Search for all MFU files across replicas and stages
+    # Locate all MFU files across replicas and stages
     mfu_files = glob.glob(f"{run_dir}/plots/replica_*_stage_*_mfu.json")
     if not mfu_files:
         logger.warning("No MFU files found in the directory.")
         return
 
+    # Retrieve the number of GPUs from the config file
+    config_file = os.path.join(run_dir, "config.json")
+    try:
+        with open(config_file, "r") as f:
+            config_data = json.load(f)
+        num_gpus = (
+            config_data["cluster_config"]["num_replicas"] *
+            config_data["cluster_config"]["replica_config"]["tensor_parallel_size"] *
+            config_data["cluster_config"]["replica_config"]["num_pipeline_stages"]
+        )
+    except KeyError:
+        logger.warning("Number of GPUs could not be determined. Defaulting to 1 GPU.")
+        num_gpus = 1
+
     mfu_energy_data = []
-    
+
     # Process each MFU file
     for mfu_file in mfu_files:
         with open(mfu_file, "r") as f:
             mfu_data = json.load(f)
 
-        stage_name = mfu_file.split("_stage_")[1].split("_mfu.json")[0]  # Extract stage number
+        # Dynamically extract replica and stage information from the file name
+        replica_stage_match = re.search(r"replica_(\d+)_stage_(\d+)", mfu_file)
+        if not replica_stage_match:
+            logger.warning(f"Failed to parse replica and stage from {mfu_file}")
+            continue
 
-        # Process MFU values for each timestamp
-        batch_stage_values = {}
-        for entry in mfu_data["replica_1_stage_1_mfu_distribution"]:  # Replace stage_1 dynamically
-            time = entry["time"]
-            mfu = entry["mfu"] / 100  # Convert from percentage to ratio
-            if mfu == 0:  # Skip entries with MFU = 0
+        replica_id = int(replica_stage_match.group(1))
+        stage_id = int(replica_stage_match.group(2))
+
+        # Get the correct MFU distribution key dynamically
+        key = f"replica_{replica_id}_stage_{stage_id}_mfu_distribution"
+        if key not in mfu_data:
+            logger.warning(f"Key {key} not found in {mfu_file}")
+            continue
+
+        # Extract the "distribution" field
+        entries = mfu_data[key]
+
+        # Convert to DataFrame for easier handling
+        df = pd.DataFrame(entries)
+
+        # Filter out rows with 0 MFU values
+        df = df[df["mfu"] > 0]
+
+        # Sort by time
+        df = df.sort_values(by="time")
+
+        # Calculate energy consumption
+        for i in range(1, len(df)):
+            time_current = df.iloc[i]["time"]
+            time_previous = df.iloc[i - 1]["time"]
+
+            mfu = df.iloc[i]["mfu"] / 100  # Convert percentage to ratio
+            execution_time = time_current - time_previous
+
+            # Skip invalid execution times
+            if execution_time <= 0:
+                logger.warning(f"Execution time is non-positive: {execution_time} at time {time_current}")
                 continue
 
-            # Aggregate MFU by time (batch stage)
-            if time not in batch_stage_values:
-                batch_stage_values[time] = []
-            batch_stage_values[time].append(mfu)
+            # Convert execution time from seconds to hours and account for the number of GPUs
+            gpu_hrs = (execution_time / 3600) * num_gpus
+            energy_consumption = calculate_energy_consumption(gpu_hrs, power_values, mfu)
 
-        # Average MFU across replicas for each time (batch stage)
-        for time, mfus in batch_stage_values.items():
-            avg_mfu = np.mean(mfus)
-            energy_consumption = calculate_energy_consumption(1 / 3600, power_values, avg_mfu)  # 1 second -> hours
-            mfu_energy_data.append({"time": time, "stage": stage_name, "mfu": avg_mfu, "energy": energy_consumption})
+            mfu_energy_data.append({
+                "time": time_current,
+                "replica": replica_id,
+                "stage": stage_id,
+                "mfu": mfu,
+                "energy": energy_consumption,
+                "gpu_hrs": gpu_hrs
+            })
 
-    # Save to CSV for later analysis
+    # Save results to a CSV
     output_file = os.path.join(run_dir, "analysis/mfu_energy_data.csv")
     pd.DataFrame(mfu_energy_data).to_csv(output_file, index=False)
     logger.info(f"MFU and energy data saved to {output_file}")
@@ -421,7 +469,6 @@ def process_trace(sim_results_dir: str):
     carbon_intensity = 350.861  # Carbon intensity for California
 
     power_values = get_gpu_power(sim_results_dir)
-    # Process MFU and energy data for batch stages
     process_mfu_energy(sim_results_dir, power_values)
     manufacturing_emissions = power_values["manufacturing_emissions"]
 
